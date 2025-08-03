@@ -30,14 +30,14 @@ class FVVV(
   override fun equals(other: Any?): Boolean = when {
     this === other -> true
     other !is FVVV -> false
-    else           -> this.value == other.value
+    else           -> value == other.value
   }
 
   override fun hashCode(): Int = value?.hashCode() ?: 0
   override fun toString(): String = value?.toString() ?: "null"
 
   inline fun <reified T> asType(default: T? = null): T? {
-    var v: Any? = this.value
+    var v: Any? = value
     while (v is FVVV) v = v.value
     return v as? T ?: default
   }
@@ -78,7 +78,7 @@ class FVVV(
   val isNotEmpty: Boolean get() = !isEmpty
 
   inline fun <reified T> isType(): Boolean {
-    var v: Any? = this.value
+    var v: Any? = value
     while (v is FVVV) v = v.value
     return v is T
   }
@@ -207,7 +207,7 @@ class FVVV(
     while (idx < runes.size) {
       idxChar = runes[idx]
       isRealChar = lastChar != '\\'
-      if (this.let { rootKey ->
+      if (let { rootKey ->
           var idxKey: FVVV
           if (inDesc) {
             if (idxChar != '>' || !isRealChar) {
