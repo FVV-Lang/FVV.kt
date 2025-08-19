@@ -1,5 +1,5 @@
 //====================================================================================================
-// Copyright (C) 2016-present Anne Sakitin (Tianwan Ayana).                                          =
+// Copyright (C) 2016-present ShIroRRen.                                                             =
 //                                                                                                   =
 // Licensed under the F2DLPR License.                                                                =
 //                                                                                                   =
@@ -12,7 +12,7 @@
 
 @file:Suppress("unused")
 
-package `in`.sakit.fvv
+package ren.shiror.fvv
 
 import kotlin.reflect.KClass
 
