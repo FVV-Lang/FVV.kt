@@ -22,50 +22,50 @@ class FVVV(
 	var desc: String = "",
 	var link: String = "",
 ) {
-	operator fun get(key: String): FVVV = sub.getOrPut(key) { FVVV() }
+	operator fun get(key: String) = sub.getOrPut(key) { FVVV() }
 	operator fun set(key: String, v: Any?) {
 		sub.getOrPut(key) { FVVV() }.value = v
 	}
 
-	override fun equals(other: Any?): Boolean = when {
+	override fun equals(other: Any?) = when {
 		this === other -> true
 		other !is FVVV -> false
 		else           -> value == other.value
 	}
 
-	override fun hashCode(): Int = value?.hashCode() ?: 0
-	override fun toString(): String = value?.toString() ?: "null"
+	override fun hashCode() = value?.hashCode() ?: 0
+	override fun toString() = "$value"
 
 	inline fun <reified T> asType(default: T? = null): T? {
-		var v: Any? = value
+		var v = value
 		while (v is FVVV) v = v.value
 		return v as? T ?: default
 	}
 
-	fun asBool(default: Boolean = false): Boolean = asType(default) ?: default
-	fun asInt(default: Int = 0): Int = asType(default) ?: default
-	fun asDouble(default: Double = 0.0): Double = asType(default) ?: default
-	fun asString(default: String = ""): String = asType(default) ?: default
-	fun asBools(default: List<Boolean> = emptyList()): List<Boolean> =
+	fun asBool(default: Boolean = false) = asType(default) ?: default
+	fun asInt(default: Int = 0) = asType(default) ?: default
+	fun asDouble(default: Double = 0.0) = asType(default) ?: default
+	fun asString(default: String = "") = asType(default) ?: default
+	fun asBools(default: List<Boolean> = emptyList()) =
 		(asType<List<*>>()?.mapNotNull { it as? Boolean } ?: default)
 
-	fun asInts(default: List<Int> = emptyList()): List<Int> =
+	fun asInts(default: List<Int> = emptyList()) =
 		(asType<List<*>>()?.mapNotNull { it as? Int } ?: default)
 
-	fun asDoubles(default: List<Double> = emptyList()): List<Double> =
+	fun asDoubles(default: List<Double> = emptyList()) =
 		(asType<List<*>>()?.mapNotNull { it as? Double } ?: default)
 
-	fun asStrings(default: List<String> = emptyList()): List<String> =
+	fun asStrings(default: List<String> = emptyList()) =
 		(asType<List<*>>()?.mapNotNull { it as? String } ?: default)
 
-	val bool get(): Boolean = asType() ?: false
-	val int get(): Int = asType() ?: 0
-	val double get(): Double = asType() ?: 0.0
-	val string get(): String = asType() ?: ""
-	val bools get(): List<Boolean> = (asType<List<*>>()?.mapNotNull { it as? Boolean } ?: emptyList())
-	val ints get(): List<Int> = (asType<List<*>>()?.mapNotNull { it as? Int } ?: emptyList())
-	val doubles get(): List<Double> = (asType<List<*>>()?.mapNotNull { it as? Double } ?: emptyList())
-	val strings get(): List<String> = (asType<List<*>>()?.mapNotNull { it as? String } ?: emptyList())
+	val bool get() = asType<Boolean>() ?: false
+	val int get() = asType<Int>() ?: 0
+	val double get() = asType<Double>() ?: 0.0
+	val string get() = asType<String>() ?: ""
+	val bools get() = (asType<List<*>>()?.mapNotNull { it as? Boolean } ?: emptyList())
+	val ints get() = (asType<List<*>>()?.mapNotNull { it as? Int } ?: emptyList())
+	val doubles get() = (asType<List<*>>()?.mapNotNull { it as? Double } ?: emptyList())
+	val strings get() = (asType<List<*>>()?.mapNotNull { it as? String } ?: emptyList())
 
 	val isEmpty: Boolean
 		get() = when (value) {
@@ -75,10 +75,10 @@ class FVVV(
 			is FVVV    -> (value as FVVV).isEmpty
 			else       -> false
 		}
-	val isNotEmpty: Boolean get() = !isEmpty
+	val isNotEmpty get() = !isEmpty
 
 	inline fun <reified T> isType(): Boolean {
-		var v: Any? = value
+		var v = value
 		while (v is FVVV) v = v.value
 		return v is T
 	}
@@ -88,7 +88,7 @@ class FVVV(
 		else    -> value?.let { it::class }
 	}
 
-	fun print(type: String = "common"): String {
+	fun print(type: String = "common", indentLv: Int = 0): String {
 		var isMin = false
 		var isBiglist = false
 		var isNodesc = false
@@ -110,50 +110,66 @@ class FVVV(
 				else result.append("$indent$path = ")
 				if (node.link.isNotEmpty()) result.append(node.link)
 				else {
-					val vecIndent = " ".repeat((indentLv + 1) * 2)
 					when (val v = node.value) {
-						is String                     -> result.append('"')
-							.append(v.replace("\"", "\\\"")).append('"')
-
-						is Boolean, is Int, is Double -> result.append(v.toString())
-						is List<*>                    -> {
-							result.append("[")
-							if (isBiglist) result.append("\n")
-							v.forEach { item ->
-								if (isBiglist) result.append(vecIndent)
-								result.append(
-									when (item) {
-										is String -> "\"${item.replace("\"", "\\\"")}\""
-										else      -> item.toString()
-									}
-								)
-								if (isBiglist) result.append("\n")
+						is String  -> result.append('"').append(v.replace("\"", "\\\"")).append('"')
+						is List<*> -> {
+							val listIndent = " ".repeat((indentLv + 1) * 2)
+							result.append('[')
+							if (isBiglist || v.first() is FVVV) result.appendLine()
+							if (v.first() is FVVV) v.forEach {
+								if (!isMin) result.append(listIndent)
+								result.append('{')
+								if (!isMin) result.appendLine()
+								result.append((it as FVVV).print(type, indentLv + 2))
+								if (isMin) result.append(";}")
+								else result.apply {
+									appendLine()
+									append(listIndent)
+									append('}')
+								}
+								if (it.desc.isNotEmpty()) {
+									if (!isMin) result.append(' ')
+									result.append('<').append(it.desc.replace(">", "\\>")).append('>')
+								}
+								if (isMin) result.append(',')
+								else result.appendLine()
+							}
+							else (v.takeIf { it.first() !is String } ?: v.map {
+								"\"${
+									"$it".replace("\"", "\\\"")
+								}\""
+							}).forEach { item ->
+								if (isBiglist) result.append(listIndent)
+								result.append(item)
+								if (isBiglist) result.appendLine()
 								else {
-									result.append(",")
-									if (!isMin) result.append(" ")
+									result.append(',')
+									if (!isMin) result.append(' ')
 								}
 							}
-							if (isBiglist) result.append(indent)
+							if (isBiglist || v.first() is FVVV) result.append(indent)
 							else if (v.isNotEmpty()) {
 								result.setLength(result.length - 1)
 								if (!isMin) result.setLength(result.length - 1)
 							}
-							result.append("]")
+							result.append(']')
 						}
+
+						else       -> result.append(v)
 					}
 				}
 			} else node.sub.forEach { (k, v) -> printFunc(k, v, indentLv + 1) }
 			if (node.sub.isNotEmpty() && node.link.isEmpty()) {
 				if (!isMin) result.append(indent)
-				result.append("}")
+				result.append('}')
 			}
 			if (node.desc.isNotEmpty() && !isMin && !isNodesc) result.append(" <")
-				.append(node.desc.replace(">", "\\>")).append(">")
-			if (isMin) result.append(";") else result.append("\n")
+				.append(node.desc.replace(">", "\\>")).append('>')
+			if (isMin) result.append(';') else result.appendLine()
 		}
-		sub.forEach { (k, v) -> printFunc(k, v, 0) }
+		sub.forEach { (k, v) -> printFunc(k, v, indentLv) }
 		if (result.isNotEmpty()) result.setLength(result.length - 1)
-		return result.toString()
+		return "$result"
 	}
 
 	fun addFromString(targetTxt: String) {
@@ -180,44 +196,51 @@ class FVVV(
 			return tmpKey
 		}
 
-		var endGroup = false
+		data class FVVVDat(
+			val valueName: StringBuilder = StringBuilder(),
+			var idxDesc: String = "",
+			var valueNames: MutableList<String> = mutableListOf(),
+			val groupNames: MutableList<String> = mutableListOf(),
+			val lastGroupNames: MutableList<List<String>> = mutableListOf(),
+			val tmpFVVs: MutableList<FVVV> = mutableListOf(),
+			var inValue: Boolean = false,
+			var inList: Boolean = false,
+			var isList: Boolean = false,
+			var groupNum: Int = 0,
+			val fvvv: FVVV = FVVV()
+		)
+
+		val tmpDesc = StringBuilder()
+		val value = StringBuilder()
+		val values = mutableListOf<String>()
 		var oldFVV = false
+		var endGroup = false
 		var isRealChar: Boolean
-		var inValue = false
 		var inDesc = false
 		var inStr = false
 		var isStr = false
 		var isAllStr = false
 		var isEmptyStr = false
-		var inList = false
-		var isList = false
-
-		val tmpDesc = StringBuilder()
-		val value = StringBuilder()
-		val valueName = StringBuilder()
-		var idxDesc = ""
 		var idxChar: Char
 		var lastChar = '\u0000'
-		var groupNum = 0
 		var idx = 0
-		val values = mutableListOf<String>()
-		var valueNames = mutableListOf<String>()
-		val groupNames = mutableListOf<String>()
-		val lastGroupNames = mutableListOf<List<String>>()
-
+		val rootDat = FVVVDat()
+		val fvvStack = mutableListOf<FVVVDat>()
 		val runes = txt.toCharArray()
 		while (idx < runes.size) {
 			idxChar = runes[idx]
 			isRealChar = lastChar != '\\'
-			if (let { rootKey ->
-					var idxKey: FVVV
+			val rootKey = if (fvvStack.isEmpty()) this else fvvStack.last().fvvv
+			var idxKey: FVVV
+			val idxDat = if (fvvStack.isEmpty()) rootDat else fvvStack.last()
+			if (let {
 					if (inDesc) {
 						if (idxChar != '>' || !isRealChar) {
-							if (idxChar == '>' && !isRealChar) tmpDesc.setLength(tmpDesc.length - 1)
-							if (inValue || groupNum > 0) tmpDesc.append(idxChar)
+							if (idxChar == '>') tmpDesc.setLength(tmpDesc.length - 1)
+							if (idxDat.inValue || idxDat.groupNum > 0) tmpDesc.append(idxChar)
 							return@let false
 						} else {
-							idxDesc = tmpDesc.toString()
+							idxDat.idxDesc = "$tmpDesc"
 							tmpDesc.clear()
 							inDesc = false
 							return@let false
@@ -229,7 +252,7 @@ class FVVV(
 							return@let false
 						}
 					}
-					if (inValue) {
+					if (idxDat.inValue) {
 						if (inStr) {
 							if (idxChar == '"') {
 								if (isRealChar) {
@@ -238,7 +261,7 @@ class FVVV(
 									return@let false
 								} else {
 									value.apply {
-										setLength(value.length - 1)
+										setLength(length - 1)
 										append(idxChar)
 									}
 									return@let false
@@ -249,22 +272,27 @@ class FVVV(
 							}
 						} else {
 							when {
-								idxChar == '"'                              -> {
+								idxChar == '"'                                     -> {
 									inStr = true
 									isStr = true
 									isAllStr = true
 									return@let false
 								}
 
-								idxChar == '['                              -> {
-									inList = true
-									isList = true
+								idxChar == '['                                     -> {
+									idxDat.inList = true
+									idxDat.isList = true
 									return@let false
 								}
 
-								inList && idxChar in listOf(']', ',', '\n') -> {
+								idxDat.inList && idxChar == '{'                    -> {
+									fvvStack.add(FVVVDat())
+									return@let false
+								}
+
+								idxDat.inList && idxChar in listOf(']', ',', '\n') -> {
 									if (idxChar == ']') {
-										inList = false
+										idxDat.inList = false
 										var pos = 1
 										var inListDesc = false
 										while (true) {
@@ -288,20 +316,31 @@ class FVVV(
 												'\n'
 											)
 										) return@let false
-									} else if (value.isEmpty() && (!isAllStr || !isEmptyStr)) return@let false
-									val valueStr = value.toString()
+									} else if (idxDat.tmpFVVs.isEmpty() && value.isEmpty() && (!isAllStr || !isEmptyStr)) return@let false
+									val valueStr = "$value"
 									if ((isAllStr && isStr) || valueStr in listOf(
 											"true", "false"
 										) || valueStr.toIntOrNull() != null || valueStr.toDoubleOrNull() != null
 									) {
 										values.add(valueStr)
 									} else {
-										idxKey = getKey(listOf(valueStr), getKey(groupNames, rootKey))
+										idxKey =
+											getKey(listOf(valueStr), getKey(idxDat.groupNames, rootKey))
 										when (val v = idxKey.value) {
-											is String                     -> values.add(v)
-											is Boolean, is Int, is Double -> values.add(v.toString())
-											is List<*>                    -> values.addAll(v.map { it.toString() })
+											is String  -> values.add(v)
+											is List<*> -> @Suppress(
+												"UNCHECKED_CAST"
+											) if (v.first() is FVVV) idxDat.tmpFVVs.addAll(
+												(v as List<FVVV>).toList()
+											)
+											else values.addAll(v.map { "$it" })
+
+											else       -> values.add("$v")
 										}
+									}
+									if (idxDat.tmpFVVs.isNotEmpty() && idxDat.idxDesc.isNotEmpty()) {
+										idxDat.tmpFVVs.last().desc = idxDat.idxDesc
+										idxDat.idxDesc = ""
 									}
 									if (isEmptyStr) isEmptyStr = false
 									else value.clear()
@@ -309,32 +348,33 @@ class FVVV(
 									return@let false
 								}
 
-								idxChar == '{'                              -> {
-									groupNames.addAll(valueNames)
-									lastGroupNames.add(valueNames.toList())
-									valueNames.clear()
-									++groupNum
-									inValue = false
+								idxChar == '{'                                     -> {
+									idxDat.groupNames.addAll(idxDat.valueNames)
+									idxDat.lastGroupNames.add(idxDat.valueNames.toList())
+									idxDat.valueNames.clear()
+									++idxDat.groupNum
+									idxDat.inValue = false
 									return@let false
 								}
 
-								idxChar in listOf(';', '\n')                -> {
-									idxKey = getKey(valueNames, getKey(groupNames, rootKey))
-									if (isList) {
+								idxChar in listOf(';', '\n')                       -> {
+									idxKey = getKey(idxDat.valueNames, getKey(idxDat.groupNames, rootKey))
+									if (idxDat.isList) {
 										idxKey.value = when {
-											values.isEmpty()                   -> null
-											isAllStr                           -> values.toList()
+											values.isEmpty() && idxDat.tmpFVVs.isEmpty() -> null
+											idxDat.tmpFVVs.isNotEmpty()                  -> idxDat.tmpFVVs.toList()
+											isAllStr                                     -> values.toList()
 											values[0] in listOf(
 												"true",
 												"false"
-											)                                  -> values.map { it == "true" }
+											)                                            -> values.map { it == "true" }
 
-											values[0].toIntOrNull() != null    -> values.mapNotNull { it.toIntOrNull() }
-											values[0].toDoubleOrNull() != null -> values.mapNotNull { it.toDoubleOrNull() }
-											else                               -> null
+											values[0].toIntOrNull() != null              -> values.mapNotNull { it.toIntOrNull() }
+											values[0].toDoubleOrNull() != null           -> values.mapNotNull { it.toDoubleOrNull() }
+											else                                         -> null
 										}
 									} else {
-										val valueStr = value.toString()
+										val valueStr = "$value"
 										idxKey.value = when {
 											isAllStr                            -> valueStr
 											valueStr in listOf("true", "false") -> valueStr == "true"
@@ -352,52 +392,61 @@ class FVVV(
 											}
 										}
 									}
-									idxKey.desc = idxDesc
-									idxDesc = ""
+									idxKey.desc = idxDat.idxDesc
+									idxDat.idxDesc = ""
 									value.clear()
 									values.clear()
-									valueNames.clear()
-									inValue = false
+									idxDat.valueNames.clear()
+									idxDat.tmpFVVs.clear()
+									idxDat.inValue = false
 									isStr = false
 									isAllStr = false
-									isList = false
+									idxDat.isList = false
 									return@let false
 								}
 
-								else                                        -> {
+								else                                               -> {
 									value.append(idxChar)
 									return@let false
 								}
 							}
 						}
-					} else {
-						if (!oldFVV && idxChar == '{' && valueName.isEmpty()) {
-							oldFVV = true
-							return@let false
-						} else if (idxChar == '=') {
-							valueNames = valueName.toString().trim().split(".").toMutableList()
-							valueName.clear()
-							inValue = true
-							return@let false
-						} else if (endGroup && idxChar in listOf(';', '\n') && groupNum > 0) {
-							endGroup = false
-							if (idxDesc.isNotEmpty()) {
-								getKey(groupNames, rootKey).desc = idxDesc
-								idxDesc = ""
-							}
-							repeat(lastGroupNames.last().size) { groupNames.removeAt(groupNames.size - 1) }
-							lastGroupNames.removeAt(lastGroupNames.size - 1)
-							--groupNum
-							return@let false
-						} else if (idxChar == '}') if (groupNum == 0) return@let true
-						else {
+					} else if (!oldFVV && idxChar == '{' && idxDat.valueName.isEmpty()) {
+						oldFVV = true
+						return@let false
+					} else if (idxChar == '=') {
+						idxDat.valueNames = "${idxDat.valueName}".trim().split(".").toMutableList()
+						idxDat.valueName.clear()
+						idxDat.inValue = true
+						return@let false
+					} else if (endGroup && idxChar in listOf(';', '\n') && idxDat.groupNum > 0) {
+						endGroup = false
+						if (idxDat.idxDesc.isNotEmpty()) {
+							getKey(idxDat.groupNames, rootKey).desc = idxDat.idxDesc
+							idxDat.idxDesc = ""
+						}
+						repeat(idxDat.lastGroupNames.last().size) {
+							idxDat.groupNames.removeAt(idxDat.groupNames.size - 1)
+						}
+						idxDat.lastGroupNames.removeAt(idxDat.lastGroupNames.size - 1)
+						--idxDat.groupNum
+						return@let false
+					} else if (idxChar == '}') {
+						if (idxDat.groupNum == 0) {
+							if (fvvStack.isNotEmpty()) {
+								fvvStack.last().fvvv.let {
+									fvvStack.removeLast()
+									(if (fvvStack.isEmpty()) rootDat else fvvStack.last()).tmpFVVs.add(it)
+								}
+								return@let false
+							} else return@let true
+						} else {
 							endGroup = true
 							return@let false
 						}
-						else {
-							valueName.append(idxChar)
-							return@let false
-						}
+					} else {
+						idxDat.valueName.append(idxChar)
+						return@let false
 					}
 				}) break
 			lastChar = idxChar
