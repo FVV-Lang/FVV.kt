@@ -177,25 +177,6 @@ class FVVV(
 		if (txt.isEmpty()) return
 		if (!txt.endsWith("}")) txt += "\n"
 
-		fun getKey(paths: List<String>, rootKey: FVVV): FVVV {
-			var tmpKey = rootKey
-			for (path in paths) tmpKey = tmpKey[path]
-			return tmpKey
-		}
-
-		fun findKey(path: String, idxKey: FVVV, rootKey: FVVV): FVVV {
-			val tmpNames = path.trim().split('.')
-			var tmpKey = idxKey
-			for (key in tmpNames) if (tmpKey.sub.containsKey(key)) tmpKey = tmpKey[key]
-			else break
-			if (tmpKey.isEmpty || tmpKey.sub.isEmpty()) {
-				tmpKey = rootKey
-				for (key in tmpNames) if (tmpKey.sub.containsKey(key)) tmpKey = tmpKey[key]
-				else break
-			}
-			return tmpKey
-		}
-
 		data class FVVVDat(
 			val valueName: StringBuilder = StringBuilder(),
 			var idxDesc: String = "",
@@ -207,8 +188,37 @@ class FVVV(
 			var inList: Boolean = false,
 			var isList: Boolean = false,
 			var groupNum: Int = 0,
-			val fvvv: FVVV = FVVV()
-		)
+			val rootKey: FVVV = FVVV()
+		) {
+			var idxKey = rootKey
+		}
+
+		fun getKey(paths: List<String>, rootKey: FVVV): FVVV {
+			var tmpKey = rootKey
+			for (path in paths) tmpKey = tmpKey[path]
+			return tmpKey
+		}
+
+		fun findKey(path: String, stackDat: List<FVVVDat>): FVVV {
+			val tmpNames = path.trim().split('.')
+			lateinit var tmpKey: FVVV
+			fun find(idxDat: FVVVDat): Boolean {
+				tmpKey = idxDat.idxKey
+				for (key in tmpNames) if (tmpKey.sub.containsKey(key)) tmpKey = tmpKey[key]
+				else break
+				if (tmpKey.isEmpty && tmpKey.sub.isEmpty()) {
+					tmpKey = idxDat.rootKey
+					for (key in tmpNames) if (tmpKey.sub.containsKey(key)) tmpKey = tmpKey[key]
+					else break
+				}
+				return tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty()
+			}
+			for (idx in stackDat.size - 1 downTo 0) {
+				find(stackDat[idx])
+				if (tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty()) return tmpKey
+			}
+			return tmpKey
+		}
 
 		val tmpDesc = StringBuilder()
 		val value = StringBuilder()
@@ -224,15 +234,12 @@ class FVVV(
 		var idxChar: Char
 		var lastChar = '\u0000'
 		var idx = 0
-		val rootDat = FVVVDat()
-		val fvvStack = mutableListOf<FVVVDat>()
+		val fvvStack = mutableListOf(FVVVDat(rootKey = this))
 		val runes = txt.toCharArray()
 		while (idx < runes.size) {
 			idxChar = runes[idx]
 			isRealChar = lastChar != '\\'
-			val rootKey = if (fvvStack.isEmpty()) this else fvvStack.last().fvvv
-			var idxKey: FVVV
-			val idxDat = if (fvvStack.isEmpty()) rootDat else fvvStack.last()
+			val idxDat = fvvStack.last().apply { idxKey = rootKey }
 			if (let {
 					if (inDesc) {
 						if (idxChar != '>' || !isRealChar) {
@@ -312,8 +319,7 @@ class FVVV(
 											++pos
 										}
 										if (txt.getOrNull(idx - pos) in listOf(
-												',',
-												'\n'
+												',', '\n'
 											)
 										) return@let false
 									} else if (idxDat.tmpFVVs.isEmpty() && value.isEmpty() && (!isAllStr || !isEmptyStr)) return@let false
@@ -324,9 +330,10 @@ class FVVV(
 									) {
 										values.add(valueStr)
 									} else {
-										idxKey =
-											getKey(listOf(valueStr), getKey(idxDat.groupNames, rootKey))
-										when (val v = idxKey.value) {
+										idxDat.idxKey = getKey(
+											listOf(valueStr), getKey(idxDat.groupNames, idxDat.rootKey)
+										)
+										when (val v = idxDat.idxKey.value) {
 											is String  -> values.add(v)
 											is List<*> -> @Suppress(
 												"UNCHECKED_CAST"
@@ -358,15 +365,16 @@ class FVVV(
 								}
 
 								idxChar in listOf(';', '\n')                       -> {
-									idxKey = getKey(idxDat.valueNames, getKey(idxDat.groupNames, rootKey))
+									idxDat.idxKey = getKey(
+										idxDat.valueNames, getKey(idxDat.groupNames, idxDat.rootKey)
+									)
 									if (idxDat.isList) {
-										idxKey.value = when {
+										idxDat.idxKey.value = when {
 											values.isEmpty() && idxDat.tmpFVVs.isEmpty() -> null
 											idxDat.tmpFVVs.isNotEmpty()                  -> idxDat.tmpFVVs.toList()
 											isAllStr                                     -> values.toList()
 											values[0] in listOf(
-												"true",
-												"false"
+												"true", "false"
 											)                                            -> values.map { it == "true" }
 
 											values[0].toIntOrNull() != null              -> values.mapNotNull { it.toIntOrNull() }
@@ -375,24 +383,24 @@ class FVVV(
 										}
 									} else {
 										val valueStr = "$value"
-										idxKey.value = when {
+										idxDat.idxKey.value = when {
 											isAllStr                            -> valueStr
 											valueStr in listOf("true", "false") -> valueStr == "true"
 											valueStr.toIntOrNull() != null      -> valueStr.toInt()
 											valueStr.toDoubleOrNull() != null   -> valueStr.toDouble()
 											else                                -> {
-												val tmpKey = findKey(valueStr, idxKey, rootKey)
-												if (tmpKey.value != null || tmpKey.sub.isNotEmpty()) {
-													idxKey.link = valueStr
+												val tmpKey = findKey(valueStr, fvvStack)
+												if (tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty()) {
+													idxDat.idxKey.link = valueStr
 													if (tmpKey.sub.isEmpty()) tmpKey.value else {
-														idxKey.sub = tmpKey.sub
+														idxDat.idxKey.sub = tmpKey.sub
 														null
 													}
 												} else null
 											}
 										}
 									}
-									idxKey.desc = idxDat.idxDesc
+									idxDat.idxKey.desc = idxDat.idxDesc
 									idxDat.idxDesc = ""
 									value.clear()
 									values.clear()
@@ -422,7 +430,7 @@ class FVVV(
 					} else if (endGroup && idxChar in listOf(';', '\n') && idxDat.groupNum > 0) {
 						endGroup = false
 						if (idxDat.idxDesc.isNotEmpty()) {
-							getKey(idxDat.groupNames, rootKey).desc = idxDat.idxDesc
+							getKey(idxDat.groupNames, idxDat.rootKey).desc = idxDat.idxDesc
 							idxDat.idxDesc = ""
 						}
 						repeat(idxDat.lastGroupNames.last().size) {
@@ -433,10 +441,10 @@ class FVVV(
 						return@let false
 					} else if (idxChar == '}') {
 						if (idxDat.groupNum == 0) {
-							if (fvvStack.isNotEmpty()) {
-								fvvStack.last().fvvv.let {
+							if (fvvStack.size > 1) {
+								fvvStack.last().rootKey.let {
 									fvvStack.removeLast()
-									(if (fvvStack.isEmpty()) rootDat else fvvStack.last()).tmpFVVs.add(it)
+									fvvStack.last().tmpFVVs.add(it)
 								}
 								return@let false
 							} else return@let true
