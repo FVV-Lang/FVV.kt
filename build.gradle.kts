@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -34,9 +33,6 @@ kotlin {
 	tvosX64()
 
 	jvm()
-
-	@OptIn(ExperimentalWasmDsl::class) wasmJs { browser { binaries.executable() } }
-	js(IR) { browser { binaries.executable() } }
 }
 
 android {
