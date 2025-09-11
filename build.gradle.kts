@@ -1,9 +1,11 @@
+@file:Suppress("UnstableApiUsage")
+
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// noinspection GradleDynamicVersion
 plugins {
 	// noinspection AndroidGradlePluginVersion
-	id("com.android.library") version "8.11.0" apply true
-	// noinspection GradleDynamicVersion
+	id("com.android.kotlin.multiplatform.library") version "+" apply true
 	kotlin("multiplatform") version "+" apply true
 	`maven-publish`
 }
@@ -14,8 +16,18 @@ version = "-SNAPSHOT"
 kotlin {
 	withSourcesJar()
 
-	androidTarget {
+	androidLibrary {
+		namespace = "ren.shiror.fvv"
+		compileSdk = 36
+		minSdk = 1
+
 		compilerOptions.jvmTarget = JvmTarget.JVM_1_8
+
+		optimization {
+			consumerKeepRules.publish = true
+			consumerKeepRules.files("consumer-rules.pro")
+			minify = false
+		}
 	}
 
 	androidNativeArm64()
@@ -33,29 +45,6 @@ kotlin {
 	tvosX64()
 
 	jvm()
-}
-
-android {
-	namespace = "ren.shiror.fvv"
-	compileSdk = 36
-
-	defaultConfig {
-		minSdk = 1
-		consumerProguardFiles("consumer-rules.pro")
-	}
-	buildTypes {
-		release {
-			isMinifyEnabled = false
-			proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-		}
-	}
-	compileOptions {
-		sourceCompatibility = JavaVersion.VERSION_1_8
-		targetCompatibility = JavaVersion.VERSION_1_8
-	}
-	buildFeatures {
-		buildConfig = true
-	}
 }
 
 afterEvaluate {
