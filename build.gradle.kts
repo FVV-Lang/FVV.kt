@@ -60,7 +60,7 @@ afterEvaluate {
 		publications {
 			withType<MavenPublication> {
 				groupId = "ren.shiror"
-				artifactId = "fvv"
+				artifactId = "FVV"
 				version = "-SNAPSHOT"
 
 				pom {
