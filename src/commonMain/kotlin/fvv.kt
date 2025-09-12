@@ -30,7 +30,7 @@ class FVVV(
 	override fun equals(other: Any?) = when {
 		this === other -> true
 		other !is FVVV -> false
-		else           -> value == other.value
+		else           -> value == other.value || sub == other.sub
 	}
 
 	override fun hashCode() = value?.hashCode() ?: sub.hashCode()
