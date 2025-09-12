@@ -33,8 +33,8 @@ class FVVV(
 		else           -> value == other.value
 	}
 
-	override fun hashCode() = value?.hashCode() ?: 0
-	override fun toString() = "$value"
+	override fun hashCode() = value?.hashCode() ?: sub.hashCode()
+	override fun toString() = "${value ?: sub}"
 
 	inline fun <reified T> asType(default: T? = null): T? {
 		var v = value
