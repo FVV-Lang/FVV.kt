@@ -58,6 +58,9 @@ class FVVV(
 	fun asStrings(default: List<String> = emptyList()) =
 		(asType<List<*>>()?.mapNotNull { it as? String } ?: default)
 
+	fun asFVVVs(default: List<FVVV> = emptyList()) =
+		(asType<List<*>>()?.mapNotNull { it as? FVVV } ?: default)
+
 	val bool get() = asType<Boolean>() ?: false
 	val int get() = asType<Int>() ?: 0
 	val double get() = asType<Double>() ?: 0.0
@@ -66,6 +69,7 @@ class FVVV(
 	val ints get() = (asType<List<*>>()?.mapNotNull { it as? Int } ?: emptyList())
 	val doubles get() = (asType<List<*>>()?.mapNotNull { it as? Double } ?: emptyList())
 	val strings get() = (asType<List<*>>()?.mapNotNull { it as? String } ?: emptyList())
+	val fvvvs get() = (asType<List<*>>()?.mapNotNull { it as? FVVV } ?: emptyList())
 
 	val isEmpty: Boolean
 		get() = when (value) {
