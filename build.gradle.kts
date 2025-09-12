@@ -30,6 +30,8 @@ kotlin {
 		}
 	}
 
+	jvm()
+
 	androidNativeArm64()
 	androidNativeArm32()
 	androidNativeX64()
@@ -43,8 +45,6 @@ kotlin {
 	tvosArm64()
 	tvosSimulatorArm64()
 	tvosX64()
-
-	jvm()
 }
 
 afterEvaluate {
