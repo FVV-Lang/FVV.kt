@@ -447,7 +447,7 @@ class FVVV(
 						if (idxDat.groupNum == 0) {
 							if (fvvStack.size > 1) {
 								fvvStack.last().rootKey.let {
-									fvvStack.removeLast()
+									fvvStack.removeAt(fvvStack.size - 1)
 									fvvStack.last().tmpFVVs.add(it)
 								}
 								return@let false
