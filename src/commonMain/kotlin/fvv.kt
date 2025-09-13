@@ -30,7 +30,7 @@ class FVVV(
 	override fun equals(other: Any?) = when {
 		this === other -> true
 		other !is FVVV -> false
-		else           -> value == other.value || sub == other.sub
+		else           -> value == other.value && sub == other.sub
 	}
 
 	override fun hashCode() = value?.hashCode() ?: sub.hashCode()
@@ -203,25 +203,29 @@ class FVVV(
 			return tmpKey
 		}
 
-		fun findKey(path: String, stackDat: List<FVVVDat>): FVVV {
+		fun findKey(path: String, stackDat: List<FVVVDat>): FVVV? {
 			val tmpNames = path.trim().split('.')
-			lateinit var tmpKey: FVVV
-			fun find(idxDat: FVVVDat): Boolean {
-				tmpKey = idxDat.idxKey
-				for (key in tmpNames) if (tmpKey.sub.containsKey(key)) tmpKey = tmpKey[key]
-				else break
-				if (tmpKey.isEmpty && tmpKey.sub.isEmpty()) {
-					tmpKey = idxDat.rootKey
-					for (key in tmpNames) if (tmpKey.sub.containsKey(key)) tmpKey = tmpKey[key]
-					else break
-				}
-				return tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty()
-			}
+			var tmpKey: FVVV?
 			for (idx in stackDat.size - 1 downTo 0) {
-				find(stackDat[idx])
-				if (tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty()) return tmpKey
+				val idxDat = stackDat[idx]
+				tmpKey = idxDat.idxKey
+				for (key in tmpNames) {
+					if (tmpKey?.sub?.containsKey(key) ?: false) tmpKey = tmpKey[key]
+					else {
+						tmpKey = idxDat.rootKey
+						for (key in tmpNames) {
+							if (tmpKey?.sub?.containsKey(key) ?: false) tmpKey = tmpKey[key]
+							else {
+								tmpKey = null
+								break
+							}
+						}
+						break
+					}
+				}
+				if (tmpKey != null) return tmpKey
 			}
-			return tmpKey
+			return null
 		}
 
 		val tmpDesc = StringBuilder()
@@ -394,7 +398,8 @@ class FVVV(
 											valueStr.toDoubleOrNull() != null   -> valueStr.toDouble()
 											else                                -> {
 												val tmpKey = findKey(valueStr, fvvStack)
-												if (tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty()) {
+												if (tmpKey?.run { isNotEmpty || sub.isNotEmpty() }
+														?: false) {
 													idxDat.idxKey.link = valueStr
 													if (tmpKey.sub.isEmpty()) tmpKey.value else {
 														idxDat.idxKey.sub = tmpKey.sub
