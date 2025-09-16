@@ -257,6 +257,9 @@ class FVVV(
 						} else {
 							idxDat.idxDesc = "$tmpDesc"
 							tmpDesc.clear()
+							findKey(idxDat.idxDesc, fvvStack)?.asType<String>()?.also {
+								idxDat.idxDesc = it
+							}
 							inDesc = false
 							return@let false
 						}
