@@ -22,6 +22,10 @@ class FVVV(
 	var desc: String = "",
 	var link: String = "",
 ) {
+	companion object {
+		enum class FormatOpt { Common, Min, BigList, NoDesc }
+	}
+
 	operator fun get(key: String) = sub.getOrPut(key) { FVVV() }
 	operator fun set(key: String, v: Any?) {
 		sub.getOrPut(key) { FVVV() }.value = v
@@ -79,7 +83,10 @@ class FVVV(
 			is FVVV    -> (value as FVVV).isEmpty
 			else       -> false
 		}
+
+	fun isEmpty() = isEmpty
 	val isNotEmpty get() = !isEmpty
+	fun isNotEmpty() = isNotEmpty
 
 	inline fun <reified T> isType(): Boolean {
 		var v = value
@@ -92,50 +99,46 @@ class FVVV(
 		else    -> value?.let { it::class }
 	}
 
-	fun print(type: String = "common", indentLv: Int = 0): String {
-		var isMin = false
-		var isBiglist = false
-		var isNodesc = false
-		when (type) {
-			"min"     -> isMin = true
-			"biglist" -> isBiglist = true
-			"nodesc"  -> isNodesc = true
-		}
+	fun print(opt: FormatOpt = FormatOpt.Common, indentLv: Int = 0): String {
 		val result = StringBuilder()
 		fun printFunc(path: String, node: FVVV, indentLv: Int) {
 			if (path.isEmpty() || (node.isEmpty && node.sub.isEmpty())) return
 			val indent = " ".repeat(indentLv * 2)
 			if (node.sub.isNotEmpty() && node.link.isEmpty()) {
-				if (isMin) result.append("$path={")
+				if (opt == FormatOpt.Min) result.append("$path={")
 				else result.append("$indent$path = {\n")
 			}
 			if (node.link.isNotEmpty() || node.value != null) {
-				if (isMin) result.append("$path=")
+				if (opt == FormatOpt.Min) result.append("$path=")
 				else result.append("$indent$path = ")
 				if (node.link.isNotEmpty()) result.append(node.link)
 				else {
 					when (val v = node.value) {
 						is String  -> result.append('"').append(v.replace("\"", "\\\"")).append('"')
 						is List<*> -> {
+							if (node.desc.isNotEmpty() && v.first() is FVVV) {
+								result.append('<').append(node.desc.replace(">", "\\>")).append('>')
+								if (opt != FormatOpt.Min) result.append(' ')
+							}
 							val listIndent = " ".repeat((indentLv + 1) * 2)
 							result.append('[')
-							if (isBiglist || v.first() is FVVV) result.appendLine()
-							if (v.first() is FVVV) v.forEach {
-								if (!isMin) result.append(listIndent)
+							if (opt == FormatOpt.BigList || (opt != FormatOpt.Min && v.first() is FVVV)) result.appendLine()
+							@Suppress("UNCHECKED_CAST") if (v.first() is FVVV) (v as List<FVVV>).forEach {
+								if (opt != FormatOpt.Min) result.append(listIndent)
+								if (it.desc.isNotEmpty()) {
+									result.append('<').append(it.desc.replace(">", "\\>")).append('>')
+									if (opt != FormatOpt.Min) result.append(' ')
+								}
 								result.append('{')
-								if (!isMin) result.appendLine()
-								result.append((it as FVVV).print(type, indentLv + 2))
-								if (isMin) result.append(";}")
+								if (opt != FormatOpt.Min) result.appendLine()
+								result.append(it.print(opt, indentLv + 2))
+								if (opt == FormatOpt.Min) result.append(";}")
 								else result.apply {
 									appendLine()
 									append(listIndent)
 									append('}')
 								}
-								if (it.desc.isNotEmpty()) {
-									if (!isMin) result.append(' ')
-									result.append('<').append(it.desc.replace(">", "\\>")).append('>')
-								}
-								if (isMin) result.append(',')
+								if (opt == FormatOpt.Min) result.append(',')
 								else result.appendLine()
 							}
 							else (v.takeIf { it.first() !is String } ?: v.map {
@@ -143,18 +146,20 @@ class FVVV(
 									"$it".replace("\"", "\\\"")
 								}\""
 							}).forEach { item ->
-								if (isBiglist) result.append(listIndent)
+								if (opt == FormatOpt.BigList) result.append(listIndent)
 								result.append(item)
-								if (isBiglist) result.appendLine()
+								if (opt == FormatOpt.BigList) result.appendLine()
 								else {
 									result.append(',')
-									if (!isMin) result.append(' ')
+									if (opt != FormatOpt.Min) result.append(' ')
 								}
 							}
-							if (isBiglist || v.first() is FVVV) result.append(indent)
+							if (opt == FormatOpt.BigList || (opt != FormatOpt.Min && v.first() is FVVV)) result.append(
+								indent
+							)
 							else if (v.isNotEmpty()) {
 								result.setLength(result.length - 1)
-								if (!isMin) result.setLength(result.length - 1)
+								if (opt != FormatOpt.Min) result.setLength(result.length - 1)
 							}
 							result.append(']')
 						}
@@ -164,19 +169,20 @@ class FVVV(
 				}
 			} else node.sub.forEach { (k, v) -> printFunc(k, v, indentLv + 1) }
 			if (node.sub.isNotEmpty() && node.link.isEmpty()) {
-				if (!isMin) result.append(indent)
+				if (opt != FormatOpt.Min) result.append(indent)
 				result.append('}')
 			}
-			if (node.desc.isNotEmpty() && !isMin && !isNodesc) result.append(" <")
-				.append(node.desc.replace(">", "\\>")).append('>')
-			if (isMin) result.append(';') else result.appendLine()
+			if (node.desc.isNotEmpty() && (node.value !is List<*> || (node.value as List<*>).first() !is FVVV) && opt != FormatOpt.Min && opt != FormatOpt.NoDesc) result.append(
+				" <"
+			).append(node.desc.replace(">", "\\>")).append('>')
+			if (opt == FormatOpt.Min) result.append(';') else result.appendLine()
 		}
 		sub.forEach { (k, v) -> printFunc(k, v, indentLv) }
 		if (result.isNotEmpty()) result.setLength(result.length - 1)
 		return "$result"
 	}
 
-	fun addFromString(targetTxt: String) {
+	fun parse(targetTxt: String) {
 		var txt = targetTxt.trimStart { it == '﻿' }.trim().replace("\r\n", "\n").replace("\r", "\n")
 		if (txt.isEmpty()) return
 		if (!txt.endsWith("}")) txt += "\n"

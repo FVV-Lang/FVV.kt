@@ -10,7 +10,7 @@ ij_continuation_indent_size = 8
 indent_size = 2
 indent_style = space
 
-[{*.md,*.mkd}]
+[{*.md,*.mkd,*.mdx}]
 indent_size = 2
 indent_style = space
 
