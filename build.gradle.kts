@@ -20,6 +20,7 @@ kotlin {
 		namespace = "ren.shiror.fvv"
 		compileSdk = 36
 		minSdk = 1
+		buildToolsVersion = "36.1.0"
 
 		compilerOptions.jvmTarget = JvmTarget.JVM_1_8
 

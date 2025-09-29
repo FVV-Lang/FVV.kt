@@ -22,9 +22,7 @@ class FVVV(
 	var desc: String = "",
 	var link: String = "",
 ) {
-	companion object {
-		enum class FormatOpt { Common, Min, BigList, NoDesc }
-	}
+	enum class FormatOpt { Common, Min, BigList, NoDesc }
 
 	operator fun get(key: String) = sub.getOrPut(key) { FVVV() }
 	operator fun set(key: String, v: Any?) {
