@@ -83,10 +83,7 @@ class FVVV(
 			is FVVV    -> (value as FVVV).isEmpty
 			else       -> false
 		}
-
-	fun isEmpty() = isEmpty
 	val isNotEmpty get() = !isEmpty
-	fun isNotEmpty() = isNotEmpty
 
 	inline fun <reified T> isType(): Boolean {
 		var v = value
