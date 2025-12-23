@@ -1,5 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.palantir.gradle.gitversion.VersionDetails
+import groovy.lang.Closure
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // noinspection GradleDynamicVersion
@@ -8,10 +10,12 @@ plugins {
 	id("com.android.kotlin.multiplatform.library") version "+" apply true
 	kotlin("multiplatform") version "+" apply true
 	`maven-publish`
+	id("com.palantir.git-version") version "+"
 }
 
 group = "ren.shiror"
-version = "-SNAPSHOT"
+val versionDetails: Closure<VersionDetails> by extra
+version = versionDetails().lastTag ?: "0.1"
 
 kotlin {
 	withSourcesJar()
