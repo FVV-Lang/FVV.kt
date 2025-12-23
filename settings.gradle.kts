@@ -1,6 +1,6 @@
 @file:Suppress("UnstableApiUsage")
 
-rootProject.name = "FVV"
+rootProject.name = "fvv"
 
 pluginManagement {
 	repositories {
