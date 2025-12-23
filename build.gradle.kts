@@ -31,7 +31,9 @@ kotlin {
 		}
 	}
 
-	jvm()
+	jvm {
+		compilerOptions.jvmTarget = JvmTarget.JVM_1_8
+	}
 
 	androidNativeArm64()
 	androidNativeArm32()
