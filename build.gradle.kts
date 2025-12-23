@@ -58,7 +58,7 @@ afterEvaluate {
 			withType<MavenPublication> {
 				groupId = "ren.shiror"
 				artifactId = "FVV"
-				version = "-SNAPSHOT"
+				version = versionDetails().lastTag ?: "0.1"
 
 				pom {
 					name = "FVV"
