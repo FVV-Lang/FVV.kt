@@ -13,10 +13,6 @@ plugins {
 	id("com.palantir.git-version") version "+"
 }
 
-group = "ren.shiror"
-val versionDetails: Closure<VersionDetails> by extra
-version = versionDetails().lastTag ?: "0.1"
-
 kotlin {
 	withSourcesJar()
 
@@ -56,8 +52,8 @@ afterEvaluate {
 	publishing {
 		publications {
 			withType<MavenPublication> {
-				groupId = "ren.shiror"
-				artifactId = "fvv"
+				groupId = "ren.shiror.fvv"
+				val versionDetails: Closure<VersionDetails> by extra
 				version = versionDetails().lastTag ?: "0.1"
 
 				pom {
