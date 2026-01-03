@@ -5,9 +5,8 @@ rootProject.name = "core"
 pluginManagement {
 	repositories {
 		mavenLocal()
-		google()
 		mavenCentral()
-		maven("https://jitpack.io")
+		google()
 		gradlePluginPortal()
 	}
 }
@@ -15,9 +14,9 @@ pluginManagement {
 dependencyResolutionManagement {
 	repositories {
 		mavenLocal()
-		google()
 		mavenCentral()
-		maven("https://jitpack.io")
+		google()
 		gradlePluginPortal()
+		maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
 	}
 }

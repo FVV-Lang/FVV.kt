@@ -1,7 +1,8 @@
-@file:Suppress("UnstableApiUsage")
+@file:Suppress("UnstableApiUsage") @file:OptIn(ExperimentalWasmDsl::class)
 
 import com.palantir.gradle.gitversion.VersionDetails
 import groovy.lang.Closure
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // noinspection GradleDynamicVersion
@@ -14,6 +15,7 @@ plugins {
 }
 
 kotlin {
+	applyDefaultHierarchyTemplate()
 	withSourcesJar()
 
 	androidLibrary {
@@ -41,13 +43,32 @@ kotlin {
 	androidNativeX86()
 
 	iosArm64()
-	iosSimulatorArm64()
 	iosX64()
+	iosSimulatorArm64()
 	macosArm64()
 	macosX64()
 	tvosArm64()
-	tvosSimulatorArm64()
 	tvosX64()
+	tvosSimulatorArm64()
+	watchosArm64()
+	watchosArm32()
+	watchosX64()
+	watchosDeviceArm64()
+	watchosSimulatorArm64()
+
+	linuxArm64()
+	linuxX64()
+
+	mingwX64()
+
+	js(IR) {
+		browser()
+		nodejs()
+	}
+	wasmJs {
+		browser()
+		nodejs()
+	}
 }
 
 afterEvaluate {
