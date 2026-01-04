@@ -15,6 +15,7 @@
 package ren.shiror.fvv
 
 import kotlin.reflect.KClass
+import kotlin.reflect.typeOf
 
 class FVVV(
 	value: Any? = null,
@@ -91,8 +92,19 @@ class FVVV(
 
 	fun isNotEmpty() = !isEmpty()
 
-	inline fun <reified T> `is`() = value is T
+	inline fun <reified T> `is`() =
+		(value is List<*> && (typeOf<T>().arguments.firstOrNull()?.type?.classifier as? KClass<*>?)?.let { tpCls ->
+			`as`<List<*>>()?.takeIf { list ->
+				list.all {
+					it?.let { tpCls.isInstance(it) } ?: false
+				} || (tpCls in numCls && list.all { it is Number })
+			}
+		} != null) || (value !is List<*> && value is T)
+
 	inline fun <reified T> isType() = `is`<T>()
+	inline fun <reified T> isList() =
+		`as`<List<*>>()?.takeIf { list -> list.all { it is T } || (T::class in numCls && list.all { it is Number }) } != null
+
 	val type get() = value?.run { this::class }
 
 	inline fun <reified T> `as`() = value as? T? ?: (value as? Number)?.let { num ->
@@ -126,7 +138,7 @@ class FVVV(
 
 	fun unlink(): Unit = nodes.forEach { (_, value) -> value.unlink() }.also { link = "" }
 
-	fun parseString(text: String) {
+	fun parse(text: String) {
 		if (text.trim().isEmpty()) return
 
 		val ctx = TextCtx(text)
