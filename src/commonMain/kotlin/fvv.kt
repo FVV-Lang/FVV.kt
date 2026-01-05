@@ -14,9 +14,12 @@
 
 package ren.shiror.fvv
 
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+import kotlinx.serialization.modules.EmptySerializersModule
 import kotlin.math.absoluteValue
 import kotlin.reflect.KClass
-import kotlin.reflect.typeOf
 
 open class FVVV(
 	value: Any? = null,
@@ -125,50 +128,39 @@ open class FVVV(
 
 	fun isNotEmpty() = !isEmpty()
 
-	inline fun <reified T> `is`() =
-		(value is List<*> && (typeOf<T>().arguments.firstOrNull()?.type?.classifier as? KClass<*>?)?.let { tpCls ->
-			(value as List<*>).takeIf { list ->
-				list.all {
-					it != null && tpCls.isInstance(it)
-				} || (tpCls in fpCls && list.all {
-					it != null && it::class in fpCls
-				}) || (tpCls in intCls && list.all {
-					it != null && it::class in intCls
-				})
-			}
-		} != null) || (value !is List<*> && value is T)
+	inline fun <reified T> `is`() = value is T || value?.let {
+		(it::class in fpCls && T::class in fpCls) || (it::class in intCls && T::class in intCls)
+	} ?: false
 
 	inline fun <reified T> isType() = `is`<T>()
-	inline fun <reified T> isList() = `as`<List<*>>()?.takeIf { list ->
-		list.all { it is T } || (T::class in fpCls && list.all {
-			it != null && it::class in fpCls
-		}) || (T::class in intCls && list.all {
-			it != null && it::class in intCls
-		})
-	} != null
+	inline fun <reified T> isList() = (value as? List<*>?)?.cast<T>() != null
 
 	val type get() = value?.run { this::class }
 
-	inline fun <reified T> `as`() =
-		if (`is`<T>()) value as? T? ?: (value as? Double? ?: value as? Float?)?.let { fp ->
-			when (T::class) {
-				Double::class -> fp.toDouble()
-				Float::class  -> fp.toFloat()
+	inline fun <reified T> `as`() = value as? T? ?: (value as? Number)?.let { num ->
+		when {
+			num::class in fpCls && T::class in fpCls   -> when (T::class) {
+				Double::class -> num.toDouble()
+				Float::class  -> num.toFloat()
 				else          -> null
-			} as? T?
-		} ?: (value as? Long? ?: value as? Int?)?.let { int ->
-			when (T::class) {
-				Long::class -> int.toLong()
-				Int::class  -> int.toInt()
+			}
+
+			num::class in intCls && T::class in intCls -> when (T::class) {
+				Long::class -> num.toLong()
+				Int::class  -> num.toInt()
 				else        -> null
-			} as? T?
-		} else null
+			}
+
+			else                                       -> null
+		}
+	} as? T?
 
 	inline fun <reified T> `as`(default: T) = `as`() ?: default
 	inline fun <reified T> asType() = `as`<T>()
 	inline fun <reified T> asType(default: T) = `as`(default)
 	inline fun <reified T> get() = `as`<T>()!!
-	inline fun <reified T> list(default: List<T> = emptyList()) = `as`<List<*>>()?.cast<T>() ?: default
+	inline fun <reified T> list(default: List<T> = emptyList()) =
+		(value as? List<*>?)?.cast<T>() ?: default
 
 	val bool get() = `as`(false)
 	val boolean get() = bool
@@ -222,6 +214,10 @@ open class FVVV(
 			append(ctx.fwvEnd)
 		}
 	}
+
+	inline fun <reified T> to() = FVVVDecoder(this).decodeSerializableValue(serializer<T>())
+	inline fun <reified T> from(data: T) =
+		FVVVEncoder(this).encodeSerializableValue(serializer<T>(), data)
 
 	private class TextCtx(val input: String) {
 		var index = 0
@@ -367,8 +363,123 @@ open class FVVV(
 		}
 	}
 
+	@OptIn(ExperimentalSerializationApi::class)
+	@PublishedApi
+	internal class FVVVDecoder(private val node: FVVV) : AbstractDecoder() {
+		override val serializersModule = EmptySerializersModule()
+		private var elementIndex = 0
+
+		private var tgtNode = node
+		override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
+			if (descriptor.kind is StructureKind.LIST) {
+				val list = node.value as? List<*> ?: return CompositeDecoder.DECODE_DONE
+				if (elementIndex < list.size) {
+					val item = list[elementIndex]
+					tgtNode = item as? FVVV ?: FVVV(item)
+					return elementIndex++
+				}
+				return CompositeDecoder.DECODE_DONE
+			}
+
+			while (elementIndex < descriptor.elementsCount) {
+				node.nodes[descriptor.getElementName(elementIndex)]?.apply {
+					tgtNode = this
+					return elementIndex++
+				}
+				++elementIndex
+			}
+			return CompositeDecoder.DECODE_DONE
+		}
+
+		override fun decodeBoolean() = tgtNode.boolean
+		override fun decodeByte() = tgtNode.int.toByte()
+		override fun decodeShort() = tgtNode.int.toShort()
+		override fun decodeInt() = tgtNode.int.toInt()
+		override fun decodeLong() = tgtNode.int
+		override fun decodeFloat() = tgtNode.double.toFloat()
+		override fun decodeDouble() = tgtNode.double
+		override fun decodeChar() = tgtNode.string.first()
+		override fun decodeString() = tgtNode.string
+		override fun decodeEnum(enumDescriptor: SerialDescriptor) =
+			enumDescriptor.getElementIndex("${tgtNode.value}")
+
+		override fun <T> decodeSerializableElement(
+			descriptor: SerialDescriptor,
+			index: Int,
+			deserializer: DeserializationStrategy<T>,
+			previousValue: T?
+		) = FVVVDecoder(tgtNode).decodeSerializableValue(deserializer)
+	}
+
+	@OptIn(ExperimentalSerializationApi::class)
+	@PublishedApi
+	internal class FVVVEncoder(private val node: FVVV) : AbstractEncoder() {
+		override val serializersModule = EmptySerializersModule()
+
+		private var tgtKey = null as String?
+		override fun encodeElement(descriptor: SerialDescriptor, index: Int): Boolean {
+			if (descriptor.kind !is StructureKind.LIST) tgtKey = descriptor.getElementName(index)
+			return true
+		}
+
+		private fun writeValue(value: Any) {
+			if (node.value is MutableList<*>) {
+				@Suppress("UNCHECKED_CAST") (node.value as MutableList<Any>).add(value)
+			} else tgtKey?.let { key ->
+				node[key].value = value
+				tgtKey = null
+			} ?: run {
+				node.value = value
+			}
+		}
+
+		override fun encodeBoolean(value: Boolean) = writeValue(value)
+		override fun encodeByte(value: Byte) = writeValue(value.toLong())
+		override fun encodeShort(value: Short) = writeValue(value.toLong())
+		override fun encodeInt(value: Int) = writeValue(value.toLong())
+		override fun encodeLong(value: Long) = writeValue(value)
+		override fun encodeFloat(value: Float) = writeValue(value.toDouble())
+		override fun encodeDouble(value: Double) = writeValue(value)
+		override fun encodeChar(value: Char) = writeValue("$value")
+		override fun encodeString(value: String) = writeValue(value)
+		override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) =
+			writeValue(enumDescriptor.getElementName(index))
+
+		override fun beginStructure(descriptor: SerialDescriptor) = also {
+			if (descriptor.kind is StructureKind.LIST) descriptor.getElementDescriptor(0)
+				.let { elementDesc ->
+					node.value = when (elementDesc.kind) {
+						PrimitiveKind.BOOLEAN                                                          -> mutableListOf<Boolean>()
+						PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG -> mutableListOf<Long>()
+						PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE                                      -> mutableListOf<Double>()
+						PrimitiveKind.CHAR, PrimitiveKind.STRING, SerialKind.ENUM                      -> mutableListOf<String>()
+
+						StructureKind.CLASS, StructureKind.OBJECT                                      -> mutableListOf<FVVV>()
+
+						else                                                                           -> throw SerializationException(
+							"List<${elementDesc.kind}> is not supported"
+						)
+					}
+				}
+		}
+
+		override fun <T> encodeSerializableElement(
+			descriptor: SerialDescriptor, index: Int, serializer: SerializationStrategy<T>, value: T
+		) {
+			if (descriptor.kind is StructureKind.LIST) {
+				if (serializer.descriptor.kind.run { this is StructureKind.CLASS || this is StructureKind.OBJECT }) FVVV().apply {
+					@Suppress("UNCHECKED_CAST") (node.value as MutableList<FVVV>).add(this)
+					FVVVEncoder(this).encodeSerializableValue(serializer, value)
+				}
+				else serializer.serialize(this, value)
+			} else node[descriptor.getElementName(index)].apply {
+				FVVVEncoder(this).encodeSerializableValue(serializer, value)
+			}
+		}
+	}
+
 	class ParseException(msg: String) : Exception(msg) {
-		override fun toString(): String = "ParseException: $message"
+		override fun toString() = "ParseException: $message"
 	}
 
 	private fun parseMain(ctx: TextCtx, scopeStack: MutableList<FVVV>) {
@@ -733,7 +844,6 @@ open class FVVV(
 				append(ctx.fwvEnd)
 			}
 
-		@Suppress("ReturnCount")
 		fun toStringValue(
 			ctx: FormatCtx, tgtVal: Any, ret: StringBuilder, indent: String, level: Int = 0
 		) {

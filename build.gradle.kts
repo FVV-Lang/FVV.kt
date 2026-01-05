@@ -8,8 +8,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // noinspection GradleDynamicVersion
 plugins {
 	// noinspection AndroidGradlePluginVersion
-	id("com.android.kotlin.multiplatform.library") version "+" apply true
-	kotlin("multiplatform") version "+" apply true
+	id("com.android.kotlin.multiplatform.library") version "+"
+	kotlin("multiplatform") version "+"
+	kotlin("plugin.serialization") version "+"
 	`maven-publish`
 	id("com.palantir.git-version") version "+"
 }
@@ -68,6 +69,11 @@ kotlin {
 	wasmJs {
 		browser()
 		nodejs()
+	}
+
+	// noinspection GradleDynamicVersion
+	sourceSets.commonMain.dependencies {
+		implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:+")
 	}
 }
 
