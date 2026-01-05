@@ -195,6 +195,8 @@ open class FVVV(
 		if (!ctx.isEof) throw ctx.err.whyNotEOF()
 	}
 
+	inline fun <reified T> parse(text: String) = parse(text).let { to<T>() }
+
 	override fun toString() = toString(FormatCtx())
 
 	fun toString(vararg flags: FormatOpt) =
