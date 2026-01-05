@@ -14,10 +14,11 @@
 
 package ren.shiror.fvv
 
+import kotlin.math.absoluteValue
 import kotlin.reflect.KClass
 import kotlin.reflect.typeOf
 
-class FVVV(
+open class FVVV(
 	value: Any? = null,
 	var nodes: MutableMap<String, FVVV> = mutableMapOf(),
 	var desc: String = "",
@@ -50,8 +51,12 @@ class FVVV(
 		private val _escapeTable by lazy {
 			IntArray(1 shl Byte.SIZE_BITS).apply {
 				setOf(
-					'b' to '\b', 'f' to '\u000C', // \f
-					'n' to '\n', 'r' to '\r', 't' to '\t', '\\' to '\\'
+					'b' to '\b',
+					'f' to '\u000C' /*\f*/,
+					'n' to '\n',
+					'r' to '\r',
+					't' to '\t',
+					'\\' to '\\'
 				).forEach { (src, tgt) ->
 					this[src.code] = tgt.code
 				}
@@ -63,10 +68,36 @@ class FVVV(
 		}
 	}
 
-	var value: Any? = null
-		set(tgt) {
-			field = if (tgt is FVVV) tgt.value else tgt
+	enum class FormatOpt(val mask: Int) {
+		Common(0),
+
+		UseWrapper(1 shl 0), Minify(1 shl 1),
+
+		UseCRLF(1 shl 2), UseCR(1 shl 3),
+
+		UseSpace2(1 shl 4), UseSpace4(1 shl 5),
+
+		IntBinary(1 shl 6), IntOctal(1 shl 7), IntHex(1 shl 8),
+
+		DigitSep3(1 shl 9), DigitSep4(1 shl 10),
+
+		UseColon(1 shl 11), FullWidth(1 shl 12),
+
+		KeepListSingle(1 shl 13), ForceUseSeparator(1 shl 14), RawMultilineString(1 shl 15),
+
+		NoDescs(1 shl 16), NoLinks(1 shl 17), FlattenPaths(1 shl 18), FwwStyle(1 shl 19);
+
+		companion object {
+			infix fun FormatOpt.or(other: FormatOpt) = this.mask or other.mask
+			infix fun FormatOpt.or(other: Int) = this.mask or other
+			infix fun Int.or(other: FormatOpt) = this or other.mask
+
+			fun Int.toFmtOpts() = entries.filterTo(mutableSetOf()) { (this and it.mask) != Common.mask }
 		}
+	}
+
+	var value: Any? = null
+		set(tgt) = (if (tgt is FVVV) tgt.value else tgt).let { field = it }
 
 	init {
 		this.value = value
@@ -75,9 +106,7 @@ class FVVV(
 	operator fun get(key: String) =
 		key.split('.').fold(this) { tgt, path -> tgt.nodes.getOrPut(path) { FVVV() } }
 
-	operator fun set(key: String, tgt: Any?) {
-		this[key].value = if (tgt is FVVV) tgt.value else tgt
-	}
+	operator fun set(key: String, tgt: Any?) = tgt.also { this[key].value = it }
 
 	override fun equals(other: Any?) = when {
 		this === other -> true
@@ -98,7 +127,7 @@ class FVVV(
 
 	inline fun <reified T> `is`() =
 		(value is List<*> && (typeOf<T>().arguments.firstOrNull()?.type?.classifier as? KClass<*>?)?.let { tpCls ->
-			`as`<List<*>>()?.takeIf { list ->
+			(value as List<*>).takeIf { list ->
 				list.all {
 					it != null && tpCls.isInstance(it)
 				} || (tpCls in fpCls && list.all {
@@ -120,15 +149,20 @@ class FVVV(
 
 	val type get() = value?.run { this::class }
 
-	inline fun <reified T> `as`() = value as? T? ?: (value as? Number)?.let { num ->
-		when (T::class) {
-			Long::class   -> num.toLong()
-			Int::class    -> num.toInt()
-			Double::class -> num.toDouble()
-			Float::class  -> num.toFloat()
-			else          -> null
-		} as? T?
-	}
+	inline fun <reified T> `as`() =
+		if (`is`<T>()) value as? T? ?: (value as? Double? ?: value as? Float?)?.let { fp ->
+			when (T::class) {
+				Double::class -> fp.toDouble()
+				Float::class  -> fp.toFloat()
+				else          -> null
+			} as? T?
+		} ?: (value as? Long? ?: value as? Int?)?.let { int ->
+			when (T::class) {
+				Long::class -> int.toLong()
+				Int::class  -> int.toInt()
+				else        -> null
+			} as? T?
+		} else null
 
 	inline fun <reified T> `as`(default: T) = `as`() ?: default
 	inline fun <reified T> asType() = `as`<T>()
@@ -167,6 +201,26 @@ class FVVV(
 		}
 		ctx.skipBlanks()
 		if (!ctx.isEof) throw ctx.err.whyNotEOF()
+	}
+
+	override fun toString() = toString(FormatCtx())
+
+	fun toString(vararg flags: FormatOpt) =
+		toString(FormatCtx(flags.fold(FormatOpt.Common.mask) { tgt, idx -> tgt or idx.mask }))
+
+	fun toString(vararg flags: Int) =
+		toString(FormatCtx(flags.fold(FormatOpt.Common.mask) { tgt, idx -> tgt or idx }))
+
+	private fun toString(ctx: FormatCtx) = buildString {
+		if (ctx.useWrapper) {
+			append(ctx.fwvBegin)
+			if (!ctx.minify) append(ctx.newline)
+		}
+		toStringRoot(ctx, this, if (ctx.useWrapper) 1 else 0)
+		if (ctx.useWrapper) {
+			if (!ctx.minify) append(ctx.newline)
+			append(ctx.fwvEnd)
+		}
 	}
 
 	private class TextCtx(val input: String) {
@@ -222,6 +276,97 @@ class FVVV(
 		}
 	}
 
+	private class FormatCtx(flags: Int = FormatOpt.Common.mask) {
+		var newline = "\n"
+		var indentUnit = "\t"
+		var assignOp = " = "
+		var listBegin = '['
+		var listEnd = ']'
+		var fwvBegin = '{'
+		var fwvEnd = '}'
+		var itemSep = ','
+		var stmtSep = ';'
+
+		var intBase = 10
+
+		var digitSepStep = 0
+		var digitSepChar = null as Char?
+
+		var useWrapper = false
+
+		var minify = false
+
+		var fullWidth = false
+
+		var listSingle = false
+		var forceSep = false
+		var rawStr = false
+
+		var noDescs = false
+		var noLinks = false
+		var flattenPaths = false
+		var fwwStyle = false
+
+		init {
+			fun Int.has(opt: FormatOpt) = (this and opt.mask) != FormatOpt.Common.mask
+
+			useWrapper = flags.has(FormatOpt.UseWrapper)
+
+			when {
+				flags.has(FormatOpt.UseCRLF) -> newline = "\r\n"
+				flags.has(FormatOpt.UseCR)   -> newline = "\r"
+			}
+
+			when {
+				flags.has(FormatOpt.UseSpace2) -> indentUnit = "  "
+				flags.has(FormatOpt.UseSpace4) -> indentUnit = "    "
+			}
+
+			when {
+				flags.has(FormatOpt.IntHex)    -> intBase = 16
+				flags.has(FormatOpt.IntOctal)  -> intBase = 8
+				flags.has(FormatOpt.IntBinary) -> intBase = 2
+			}
+
+			when {
+				flags.has(FormatOpt.DigitSep3) -> digitSepStep = 3
+				flags.has(FormatOpt.DigitSep4) -> digitSepStep = 4
+			}
+
+			fullWidth = flags.has(FormatOpt.FullWidth)
+			if (fullWidth) {
+				if (flags.has(FormatOpt.UseColon)) assignOp = "："
+				listBegin = '［'
+				listEnd = '］'
+				fwvBegin = '｛'
+				fwvEnd = '｝'
+				itemSep = '，'
+				stmtSep = '；'
+				if (digitSepStep > 0) digitSepChar = '’'
+			} else {
+				if (flags.has(FormatOpt.UseColon)) assignOp = ": "
+				if (digitSepStep > 0) digitSepChar = '\''
+			}
+
+			listSingle = flags.has(FormatOpt.KeepListSingle)
+			forceSep = flags.has(FormatOpt.ForceUseSeparator)
+			rawStr = flags.has(FormatOpt.RawMultilineString)
+
+			noDescs = flags.has(FormatOpt.NoDescs)
+			noLinks = flags.has(FormatOpt.NoLinks)
+			flattenPaths = flags.has(FormatOpt.FlattenPaths)
+			fwwStyle = flags.has(FormatOpt.FwwStyle)
+
+			minify = flags.has(FormatOpt.Minify)
+			if (minify) {
+				newline = ""
+				indentUnit = ""
+
+				assignOp = assignOp.trim()
+			}
+		}
+	}
+
 	class ParseException(msg: String) : Exception(msg) {
 		override fun toString(): String = "ParseException: $message"
 	}
@@ -265,12 +410,9 @@ class FVVV(
 
 					ctx.match('>', skipBlanks = false)  -> findKey(
 						"$desc", scopeStack
-					)?.takeIf { it.isType<String>() }?.let { target ->
-						desc.apply {
-							clear()
-							append(target.get<String>())
-						}
-					}.also { break }
+					)?.takeIf { it.isType<String>() }?.also { target ->
+						desc.clear().append(target.get<String>())
+					}.let { break }
 
 					ctx.match('\\', skipBlanks = false) -> when {
 						ctx.isEof                          -> throw ctx.err.whyEOF()
@@ -296,17 +438,13 @@ class FVVV(
 					ctx.match('`', skipBlanks = false) -> break
 					else                               -> text.append(ctx.next()!!)
 				}
-				"$text".trimIndent().trim().let { tmpStr ->
-					text.apply {
-						clear()
-						append(tmpStr)
-					}
+				"$text".trimIndent().trim().also { tmpStr ->
+					text.clear().append(tmpStr)
 				}
 				return
 			}
 
-			val isFullWidth = ctx.match('“')
-			if (!isFullWidth && !ctx.match('"')) throw ctx.err.unknown()
+			val isFullWidth = ctx.match('“') || !ctx.match('"')
 			while (true) when {
 				ctx.isEof                               -> throw ctx.err.whyEOF()
 
@@ -406,13 +544,13 @@ class FVVV(
 							value = "${tgtFwv.value}$tmpStr"
 						}
 					} else {
-						tryParseNumber(tmpStr)?.let { tmpNum ->
+						tryParseNumber(tmpStr)?.also { tmpNum ->
 							if (tgtFwv.value == null) tgtFwv.value = tmpNum
 							else tgtFwv.apply {
 								link = ""
 								value = "${tgtFwv.value}$tmpStr"
 							}
-						} ?: findKey(tmpStr, scopeStack)?.let { target ->
+						} ?: findKey(tmpStr, scopeStack)?.also { target ->
 							if (tgtFwv.value != null && target.value is List<*>) throw ctx.err.plusList()
 							if (tgtFwv.value == null) tgtFwv.apply {
 								link = tmpStr
@@ -512,7 +650,7 @@ class FVVV(
 
 						else          -> item
 					}
-				}.let { tmpList ->
+				}.also { tmpList ->
 					tgtList.apply {
 						clear()
 						addAll(tmpList)
@@ -545,5 +683,217 @@ class FVVV(
 		}
 
 		scopeStack.removeLast()
+	}
+
+	private fun toStringRoot(ctx: FormatCtx, ret: StringBuilder, level: Int) {
+		if (nodes.isEmpty()) return
+
+		nodes.entries.forEachIndexed { idx, (key, value) ->
+			value.toStringMain(ctx, key, ret, level, idx == nodes.size - 1)
+		}
+	}
+
+	private fun toStringMain(
+		ctx: FormatCtx,
+		name: String,
+		ret: StringBuilder,
+		level: Int,
+		isBack: Boolean,
+	) {
+		fun escapeString(str: String, isDesc: Boolean, fullWidth: Boolean = false) =
+			buildString(str.length + 6) {
+				if (isDesc) append('<')
+				else append(if (fullWidth) '“' else '"')
+
+				str.forEach { ch ->
+					when (ch) {
+						'\\'            -> "\\\\"
+						'\b'            -> "\\b"
+						'\u000C' /*\f*/ -> "\\f"
+						'\n'            -> "\\n"
+						'\r'            -> "\\r"
+						'\t'            -> "\\t"
+						'"'             -> if (!fullWidth && !isDesc) "\\\"" else ch
+						'”'             -> if (fullWidth && !isDesc) "\\”" else ch
+						'>'             -> if (isDesc) "\\>" else ch
+						else            -> ch
+					}.also { append(it) }
+				}
+
+				if (isDesc) append('>')
+				else append(if (fullWidth) '”' else '"')
+			}
+
+		fun toStringFWV(ctx: FormatCtx, tgtFwv: FVVV, ret: StringBuilder, indent: String, level: Int) =
+			ret.apply {
+				append(ctx.fwvBegin)
+				if (!ctx.minify) append(ctx.newline)
+				tgtFwv.toStringRoot(ctx, ret, level + 1)
+				if (!ctx.minify) append(ctx.newline).append(indent)
+				append(ctx.fwvEnd)
+			}
+
+		@Suppress("ReturnCount")
+		fun toStringValue(
+			ctx: FormatCtx, tgtVal: Any, ret: StringBuilder, indent: String, level: Int = 0
+		) {
+			when (tgtVal) {
+				is Boolean -> ret.append("$tgtVal")
+				is Number  -> ret.apply {
+					if (tgtVal is Long && ctx.intBase != 10) {
+						if (tgtVal == 0L) when (ctx.intBase) {
+							16   -> "0x0"
+							8    -> "0o0"
+							2    -> "0b0"
+							else -> TODO()
+						}.also {
+							append(it)
+							return
+						}
+
+						if (tgtVal < 0) append('-')
+						val tgtVal = tgtVal.absoluteValue
+
+						when (ctx.intBase) {
+							2    -> "0b"
+							8    -> "0o"
+							16   -> "0x"
+							else -> TODO()
+						}.also {
+							append(it, tgtVal.toString(ctx.intBase))
+						}
+						return
+					}
+
+					val rawNum = "$tgtVal"
+					if (ctx.digitSepStep == 0) append(rawNum).also { return }
+
+					val parts = rawNum.split('.')
+					var intPart = parts[0]
+					var hasSign = false
+					if (intPart.startsWith('-') || intPart.startsWith('+')) {
+						hasSign = true
+						intPart = intPart.substring(1)
+					}
+					val intLen = intPart.length
+
+					if (intLen <= ctx.digitSepStep) append(rawNum).also { return }
+
+					ret.ensureCapacity(ret.length + rawNum.length + intLen / ctx.digitSepStep + 1)
+					if (hasSign) append(rawNum[0])
+					intPart.forEachIndexed { idx, ch ->
+						if (idx > 0 && (intLen - idx) % ctx.digitSepStep == 0) append(ctx.digitSepChar!!)
+						append(ch)
+					}
+
+					if (parts.size >= 2) append('.').append(parts[1])
+				}
+
+				is String  -> ret.apply {
+					if (!ctx.minify && ctx.rawStr && tgtVal.length >= 3 && !tgtVal.contains('`') && tgtVal.trim()
+							.any { it in "\r\n" }
+					) {
+						val strIndent = indent + ctx.indentUnit
+						ret.ensureCapacity(ret.length + tgtVal.length + strIndent.length * 6)
+
+						append('`').append(ctx.newline)
+						tgtVal.trimIndent().trim().lineSequence().forEach { line ->
+							if (line.isNotEmpty()) append(strIndent)
+							append(line).append(ctx.newline)
+						}
+						append(indent).append('`')
+						return
+					}
+
+					if (level == 0 && ctx.fullWidth && ret.last() == ' ') ret.setLength(ret.lastIndex)
+					append(escapeString(tgtVal, isDesc = false, fullWidth = ctx.fullWidth))
+				}
+
+				is FVVV    -> ret.apply {
+					if (ctx.fwwStyle && tgtVal.desc.isNotEmpty()) {
+						append(escapeString(tgtVal.desc, isDesc = true, fullWidth = ctx.fullWidth))
+						if (!ctx.minify && !ctx.fullWidth) append(' ')
+					}
+					toStringFWV(ctx, tgtVal, ret, indent, level)
+					if (!ctx.noDescs && !ctx.fwwStyle && tgtVal.desc.isNotEmpty()) {
+						if (!ctx.minify && !ctx.fullWidth) append(' ')
+						append(escapeString(tgtVal.desc, isDesc = true, fullWidth = ctx.fullWidth))
+					}
+				}
+			}
+		}
+
+		if (name.isEmpty() || (value !is String && isEmpty() && nodes.isEmpty())) return
+		var name = name
+		ret.ensureCapacity(ret.length + nodes.size * 6)
+
+		var tgtNode = this
+		if (ctx.flattenPaths) name = buildString(name.length + 6) {
+			append(name)
+
+			while (tgtNode.nodes.size == 1 && (ctx.noDescs || tgtNode.desc.isEmpty()) && (ctx.noLinks || tgtNode.link.isEmpty())) {
+				val nodePair = tgtNode.nodes.entries.first()
+
+				append('.').append((nodePair.key))
+				tgtNode = nodePair.value
+			}
+		}
+
+		var indent = ""
+		if (!ctx.minify && level > 0) indent = ctx.indentUnit.repeat(level).also { ret.append(it) }
+		ret.append(name).append(ctx.assignOp)
+
+		if (!ctx.noLinks && tgtNode.link.isNotEmpty()) ret.append(tgtNode.link)
+		else if (tgtNode.nodes.isNotEmpty()) {
+			if (ctx.fwwStyle && tgtNode.desc.isNotEmpty()) {
+				ret.append(escapeString(tgtNode.desc, isDesc = true))
+				if (!ctx.minify) ret.append(' ')
+			}
+			if (ctx.fullWidth && ret.last() == ' ') ret.setLength(ret.lastIndex)
+			toStringFWV(ctx, tgtNode, ret, indent, level)
+		} else if (tgtNode.value !is List<*>) toStringValue(ctx, tgtNode.value!!, ret, indent)
+		else {
+			var multiline = false
+			if (!ctx.minify && !ctx.listSingle) multiline = tgtNode.`is`<List<FVVV>>() || run {
+				var longItems = 0
+				(tgtNode.value as List<*>).any { item ->
+					when (item) {
+						is String -> if (item.length + 2 >= 16) ++longItems
+						else      -> if ("$item".length >= 16) ++longItems
+					}
+					longItems >= 6
+				}
+			}
+
+			val valueIndent = indent + ctx.indentUnit
+			val valueLevel = level + 1
+
+			if (ctx.fullWidth && ret.last() == ' ') ret.setLength(ret.lastIndex)
+			ret.append(ctx.listBegin)
+			if (multiline) ret.append(ctx.newline)
+
+			(tgtNode.value as List<*>).forEachIndexed { idx, item ->
+				if (multiline) ret.append(valueIndent)
+				toStringValue(ctx, item!!, ret, valueIndent, valueLevel)
+				if (if (multiline) ctx.forceSep else idx != (tgtNode.value as List<*>).lastIndex) {
+					ret.append(ctx.itemSep)
+					if (!multiline && !ctx.fullWidth && !ctx.minify) ret.append(' ')
+				}
+				if (multiline) ret.append(ctx.newline)
+			}
+
+			if (multiline) ret.append(indent)
+			ret.append(ctx.listEnd)
+		}
+
+		if (!ctx.noDescs && tgtNode.desc.isNotEmpty() && ((tgtNode.nodes.isEmpty() && (!tgtNode.`is`<List<FVVV>>())) || tgtNode.link.isNotEmpty() || !ctx.fwwStyle)) {
+			if (!ctx.minify && (!ctx.fullWidth || tgtNode.link.isNotEmpty() || (tgtNode.nodes.isEmpty() && tgtNode.value !is List<*> && tgtNode.value !is String) || (tgtNode.value is String && ret.last() == '`'))) ret.append(
+				' '
+			)
+			ret.append(escapeString(tgtNode.desc, isDesc = true))
+		}
+
+		if (ctx.minify || ctx.forceSep) ret.append(ctx.stmtSep)
+		if (!ctx.minify && !isBack) ret.append(ctx.newline)
 	}
 }
