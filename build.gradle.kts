@@ -118,6 +118,15 @@ afterEvaluate {
 						url = "https://github.com/OOM-WG/FVV.git"
 					}
 				}
+
+				when (name) {
+					"androidRelease" -> "releaseRuntimeClasspath"
+					else             -> listOf(
+						"${name}RuntimeClasspath", "${name}CompileKlibraries"
+					).firstOrNull { project.configurations.findByName(it) != null }
+				}?.let {
+					versionMapping { allVariants { fromResolutionOf(it) } }
+				}
 			}
 		}
 		repositories {
