@@ -24,23 +24,27 @@ class FVVV(
 	var link: String = "",
 ) {
 	companion object {
-		@PublishedApi internal val numCls by lazy {
-			setOf(Long::class, Int::class, Double::class, Float::class)
-		}
+		@PublishedApi internal val intCls by lazy { setOf(Long::class, Int::class) }
+		@PublishedApi internal val fpCls by lazy { setOf(Double::class, Float::class) }
 
 		@PublishedApi
 		@Suppress("UNCHECKED_CAST")
 		internal inline fun <reified T> List<*>.cast() = when {
-			all { it is T }                            -> this
-			T::class in numCls && all { it is Number } -> when (T::class) {
-				Long::class   -> map { (it as Number).toLong() }
-				Int::class    -> map { (it as Number).toInt() }
+			all { it is T }                                                 -> this
+
+			T::class in fpCls && all { it != null && it::class in fpCls }   -> when (T::class) {
 				Double::class -> map { (it as Number).toDouble() }
 				Float::class  -> map { (it as Number).toFloat() }
 				else          -> null
 			}
 
-			else                                       -> null
+			T::class in intCls && all { it != null && it::class in intCls } -> when (T::class) {
+				Long::class -> map { (it as Number).toLong() }
+				Int::class  -> map { (it as Number).toInt() }
+				else        -> null
+			}
+
+			else                                                            -> null
 		} as? List<T>?
 
 		private val _escapeTable by lazy {
@@ -96,14 +100,23 @@ class FVVV(
 		(value is List<*> && (typeOf<T>().arguments.firstOrNull()?.type?.classifier as? KClass<*>?)?.let { tpCls ->
 			`as`<List<*>>()?.takeIf { list ->
 				list.all {
-					it?.let { tpCls.isInstance(it) } ?: false
-				} || (tpCls in numCls && list.all { it is Number })
+					it != null && tpCls.isInstance(it)
+				} || (tpCls in fpCls && list.all {
+					it != null && it::class in fpCls
+				}) || (tpCls in intCls && list.all {
+					it != null && it::class in intCls
+				})
 			}
 		} != null) || (value !is List<*> && value is T)
 
 	inline fun <reified T> isType() = `is`<T>()
-	inline fun <reified T> isList() =
-		`as`<List<*>>()?.takeIf { list -> list.all { it is T } || (T::class in numCls && list.all { it is Number }) } != null
+	inline fun <reified T> isList() = `as`<List<*>>()?.takeIf { list ->
+		list.all { it is T } || (T::class in fpCls && list.all {
+			it != null && it::class in fpCls
+		}) || (T::class in intCls && list.all {
+			it != null && it::class in intCls
+		})
+	} != null
 
 	val type get() = value?.run { this::class }
 
