@@ -100,7 +100,22 @@ open class FVVV(
 	}
 
 	var value: Any? = null
-		set(tgt) = (if (tgt is FVVV) tgt.value else tgt).let { field = it }
+		set(tgt) = (if (tgt is FVVV) tgt.value else tgt).let {
+			field = when (it) {
+				is Int     -> it.toLong()
+				is Float   -> it.toDouble()
+
+				is List<*> -> it.map { item ->
+					when (item) {
+						is Int   -> item.toLong()
+						is Float -> item.toDouble()
+						else     -> item
+					}
+				}
+
+				else       -> it
+			}
+		}
 
 	init {
 		this.value = value
@@ -852,7 +867,7 @@ open class FVVV(
 			when (tgtVal) {
 				is Boolean -> ret.append("$tgtVal")
 				is Number  -> ret.apply {
-					if (tgtVal is Long && ctx.intBase != 10) {
+					if ((tgtVal is Long || tgtVal is Int) && ctx.intBase != 10) {
 						if (tgtVal == 0L) when (ctx.intBase) {
 							16   -> "0x0"
 							8    -> "0o0"
@@ -864,7 +879,7 @@ open class FVVV(
 						}
 
 						if (tgtVal < 0) append('-')
-						val tgtVal = tgtVal.absoluteValue
+						val tgtVal = tgtVal.toLong().absoluteValue
 
 						when (ctx.intBase) {
 							2    -> "0b"
