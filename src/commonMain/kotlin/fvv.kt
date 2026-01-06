@@ -233,8 +233,9 @@ open class FVVV(
 	}
 
 	inline fun <reified T> to() = FVVVDecoder(this).decodeSerializableValue(serializer<T>())
-	inline fun <reified T> from(data: T) =
+	inline fun <reified T> from(data: T) = unlink().also {
 		FVVVEncoder(this).encodeSerializableValue(serializer<T>(), data)
+	}
 
 	private class TextCtx(val input: String) {
 		var index = 0
