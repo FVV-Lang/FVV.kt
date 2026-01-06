@@ -99,7 +99,7 @@ open class FVVV(
 		}
 	}
 
-	var value: Any? = null
+	var value = null as Any?
 		set(tgt) = (if (tgt is FVVV) tgt.value else tgt).let {
 			field = when (it) {
 				is Int     -> it.toLong()
