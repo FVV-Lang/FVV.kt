@@ -83,7 +83,7 @@ afterEvaluate {
 			withType<MavenPublication> {
 				groupId = "ren.shiror.fvv"
 				val versionDetails: Closure<VersionDetails> by extra
-				version = versionDetails().lastTag ?: "0.1"
+				version = versionDetails().lastTag ?: "0.0"
 
 				pom {
 					name = "FVV"
@@ -108,7 +108,7 @@ afterEvaluate {
 					}
 
 					organization {
-						name = "O.O.M. W.G."
+						name = "OOM WG"
 						url = "https://oom-wg.dev"
 					}
 
