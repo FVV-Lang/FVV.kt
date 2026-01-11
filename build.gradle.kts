@@ -34,9 +34,7 @@ kotlin {
 		}
 	}
 
-	jvm {
-		compilerOptions.jvmTarget = JvmTarget.JVM_1_8
-	}
+	jvm { compilerOptions.jvmTarget = JvmTarget.JVM_1_8 }
 
 	androidNativeArm64()
 	androidNativeArm32()
@@ -129,8 +127,6 @@ afterEvaluate {
 				}
 			}
 		}
-		repositories {
-			mavenLocal()
-		}
+		repositories { mavenLocal() }
 	}
 }
