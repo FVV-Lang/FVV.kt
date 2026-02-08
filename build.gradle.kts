@@ -86,7 +86,7 @@ afterEvaluate {
 				pom {
 					name = "FVV"
 					description = "FVV Language for Kotlin"
-					url = "https://github.com/OOM-WG/FVV"
+					url = "https://github.com/FVV-Lang/FVV.kt"
 
 					licenses {
 						license {
@@ -111,9 +111,9 @@ afterEvaluate {
 					}
 
 					scm {
-						connection = "scm:git:https://github.com/OOM-WG/FVV.git"
-						developerConnection = "scm:git:https://github.com/OOM-WG/FVV.git"
-						url = "https://github.com/OOM-WG/FVV.git"
+						connection = "scm:git:https://github.com/FVV-Lang/FVV.kt"
+						developerConnection = "scm:git:https://github.com/FVV-Lang/FVV.kt"
+						url = "https://github.com/FVV-Lang/FVV.kt"
 					}
 				}
 
