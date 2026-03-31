@@ -56,12 +56,7 @@ open class FVVV(
 		private val _escapeTable by lazy {
 			IntArray(1 shl Byte.SIZE_BITS).apply {
 				setOf(
-					'b' to '\b',
-					'f' to '\u000C' /*\f*/,
-					'n' to '\n',
-					'r' to '\r',
-					't' to '\t',
-					'\\' to '\\'
+					'b' to '\b', 'f' to '\u000C' /*\f*/, 'n' to '\n', 'r' to '\r', 't' to '\t', '\\' to '\\'
 				).forEach { (src, tgt) ->
 					this[src.code] = tgt.code
 				}
@@ -123,8 +118,7 @@ open class FVVV(
 		this.value = value
 	}
 
-	operator fun get(key: String) =
-		key.split('.').fold(this) { tgt, path -> tgt.nodes.getOrPut(path) { FVVV() } }
+	operator fun get(key: String) = key.split('.').fold(this) { tgt, path -> tgt.nodes.getOrPut(path) { FVVV() } }
 
 	operator fun set(key: String, tgt: Any?) = tgt.also { this[key].value = it }
 
@@ -176,8 +170,7 @@ open class FVVV(
 	inline fun <reified T> asType() = `as`<T>()
 	inline fun <reified T> asType(default: T) = `as`(default)
 	inline fun <reified T> get() = `as`<T>()!!
-	inline fun <reified T> list(default: List<T> = emptyList()) =
-		(value as? List<*>?)?.cast<T>() ?: default
+	inline fun <reified T> list(default: List<T> = emptyList()) = (value as? List<*>?)?.cast<T>() ?: default
 
 	val bool get() = `as`(false)
 	val boolean get() = bool
@@ -219,8 +212,7 @@ open class FVVV(
 	fun toString(vararg flags: FormatOpt) =
 		toString(FormatCtx(flags.fold(FormatOpt.Common.mask) { tgt, idx -> tgt or idx.mask }))
 
-	fun toString(vararg flags: Int) =
-		toString(FormatCtx(flags.fold(FormatOpt.Common.mask) { tgt, idx -> tgt or idx }))
+	fun toString(vararg flags: Int) = toString(FormatCtx(flags.fold(FormatOpt.Common.mask) { tgt, idx -> tgt or idx }))
 
 	private fun toString(ctx: FormatCtx) = buildString {
 		if (ctx.useWrapper) {
@@ -254,8 +246,7 @@ open class FVVV(
 		fun next() = if (isEof) null else input[index++].also {
 			when (it) {
 				'\r' -> linesStart.add(index)
-				'\n' -> if (index >= 2 && input[index - 2] == '\r') linesStart[linesStart.size - 1] =
-					index
+				'\n' -> if (index >= 2 && input[index - 2] == '\r') linesStart[linesStart.size - 1] = index
 				else linesStart.add(index)
 			}
 		}
@@ -283,8 +274,7 @@ open class FVVV(
 			fun unknown() = makeError("Why??? IDK!!!")
 			fun whyEOF() = makeError("Why EOF???")
 			fun whyNotEOF() = makeError("Why not EOF???")
-			fun notFound(tgt: String) =
-				makeError("Where is the ${if (tgt.length > 1) tgt else "'$tgt'"}?")
+			fun notFound(tgt: String) = makeError("Where is the ${if (tgt.length > 1) tgt else "'$tgt'"}?")
 
 			fun noValue(tgt: String) = makeError("Cannot find the value of '$tgt'")
 			fun plusList() = makeError("Why plus with list?")
@@ -420,14 +410,10 @@ open class FVVV(
 		override fun decodeDouble() = tgtNode.double
 		override fun decodeChar() = tgtNode.string.first()
 		override fun decodeString() = tgtNode.string
-		override fun decodeEnum(enumDescriptor: SerialDescriptor) =
-			enumDescriptor.getElementIndex("${tgtNode.value}")
+		override fun decodeEnum(enumDescriptor: SerialDescriptor) = enumDescriptor.getElementIndex("${tgtNode.value}")
 
 		override fun <T> decodeSerializableElement(
-			descriptor: SerialDescriptor,
-			index: Int,
-			deserializer: DeserializationStrategy<T>,
-			previousValue: T?
+			descriptor: SerialDescriptor, index: Int, deserializer: DeserializationStrategy<T>, previousValue: T?
 		) = FVVVDecoder(tgtNode).decodeSerializableValue(deserializer)
 	}
 
@@ -466,8 +452,7 @@ open class FVVV(
 			writeValue(enumDescriptor.getElementName(index))
 
 		override fun beginStructure(descriptor: SerialDescriptor) = also {
-			if (descriptor.kind is StructureKind.LIST) descriptor.getElementDescriptor(0)
-				.let { elementDesc ->
+			if (descriptor.kind is StructureKind.LIST) descriptor.getElementDescriptor(0).let { elementDesc ->
 					node.value = when (elementDesc.kind) {
 						PrimitiveKind.BOOLEAN                                                          -> mutableListOf<Boolean>()
 						PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG -> mutableListOf<Long>()
@@ -503,14 +488,13 @@ open class FVVV(
 	}
 
 	private fun parseMain(ctx: TextCtx, scopeStack: MutableList<FVVV>) {
-		fun findKey(path: String, scopeStack: List<FVVV>) =
-			path.split('.').takeIf { it.isNotEmpty() }?.let { paths ->
-				scopeStack.asReversed().firstNotNullOfOrNull { index ->
-					paths.fold(index as FVVV?) { target, idxPath ->
-						target?.nodes?.get(idxPath)
-					}
+		fun findKey(path: String, scopeStack: List<FVVV>) = path.split('.').takeIf { it.isNotEmpty() }?.let { paths ->
+			scopeStack.asReversed().firstNotNullOfOrNull { index ->
+				paths.fold(index as FVVV?) { target, idxPath ->
+					target?.nodes?.get(idxPath)
 				}
 			}
+		}
 
 		fun parseName(ctx: TextCtx) = ctx.skipBlanks().let {
 			buildString {
@@ -831,38 +815,36 @@ open class FVVV(
 		level: Int,
 		isBack: Boolean,
 	) {
-		fun escapeString(str: String, isDesc: Boolean, fullWidth: Boolean = false) =
-			buildString(str.length + 6) {
-				if (isDesc) append('<')
-				else append(if (fullWidth) '“' else '"')
+		fun escapeString(str: String, isDesc: Boolean, fullWidth: Boolean = false) = buildString(str.length + 6) {
+			if (isDesc) append('<')
+			else append(if (fullWidth) '“' else '"')
 
-				str.forEach { ch ->
-					when (ch) {
-						'\\'            -> "\\\\"
-						'\b'            -> "\\b"
-						'\u000C' /*\f*/ -> "\\f"
-						'\n'            -> "\\n"
-						'\r'            -> "\\r"
-						'\t'            -> "\\t"
-						'"'             -> if (!fullWidth && !isDesc) "\\\"" else ch
-						'”'             -> if (fullWidth && !isDesc) "\\”" else ch
-						'>'             -> if (isDesc) "\\>" else ch
-						else            -> ch
-					}.also { append(it) }
-				}
-
-				if (isDesc) append('>')
-				else append(if (fullWidth) '”' else '"')
+			str.forEach { ch ->
+				when (ch) {
+					'\\'            -> "\\\\"
+					'\b'            -> "\\b"
+					'\u000C' /*\f*/ -> "\\f"
+					'\n'            -> "\\n"
+					'\r'            -> "\\r"
+					'\t'            -> "\\t"
+					'"'             -> if (!fullWidth && !isDesc) "\\\"" else ch
+					'”'             -> if (fullWidth && !isDesc) "\\”" else ch
+					'>'             -> if (isDesc) "\\>" else ch
+					else            -> ch
+				}.also { append(it) }
 			}
 
-		fun toStringFWV(ctx: FormatCtx, tgtFwv: FVVV, ret: StringBuilder, indent: String, level: Int) =
-			ret.apply {
-				append(ctx.fwvBegin)
-				if (!ctx.minify) append(ctx.newline)
-				tgtFwv.toStringRoot(ctx, ret, level + 1)
-				if (!ctx.minify) append(ctx.newline).append(indent)
-				append(ctx.fwvEnd)
-			}
+			if (isDesc) append('>')
+			else append(if (fullWidth) '”' else '"')
+		}
+
+		fun toStringFWV(ctx: FormatCtx, tgtFwv: FVVV, ret: StringBuilder, indent: String, level: Int) = ret.apply {
+			append(ctx.fwvBegin)
+			if (!ctx.minify) append(ctx.newline)
+			tgtFwv.toStringRoot(ctx, ret, level + 1)
+			if (!ctx.minify) append(ctx.newline).append(indent)
+			append(ctx.fwvEnd)
+		}
 
 		fun toStringValue(
 			ctx: FormatCtx, tgtVal: Any, ret: StringBuilder, indent: String, level: Int = 0
