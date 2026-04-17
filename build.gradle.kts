@@ -8,11 +8,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // noinspection GradleDynamicVersion
 plugins {
 	// noinspection AndroidGradlePluginVersion
-	id("com.android.kotlin.multiplatform.library") version "+"
-	kotlin("multiplatform") version "+"
-	kotlin("plugin.serialization") version "+"
+	id("com.android.kotlin.multiplatform.library") version "9.0.0-alpha06"
+	kotlin("multiplatform") version "2.3.+"
+	kotlin("plugin.serialization") version "2.3.+"
 	`maven-publish`
-	id("com.palantir.git-version") version "+"
+	id("com.palantir.git-version") version "5.+"
 }
 
 kotlin {
@@ -21,9 +21,9 @@ kotlin {
 
 	androidLibrary {
 		namespace = "ren.shiror.fvv"
-		compileSdk = 36
+		compileSdk = 37
 		minSdk = 1
-		buildToolsVersion = "36.1.0"
+		buildToolsVersion = "37.0.0"
 
 		compilerOptions.jvmTarget = JvmTarget.JVM_1_8
 
@@ -42,16 +42,12 @@ kotlin {
 	androidNativeX86()
 
 	iosArm64()
-	iosX64()
 	iosSimulatorArm64()
 	macosArm64()
-	macosX64()
 	tvosArm64()
-	tvosX64()
 	tvosSimulatorArm64()
 	watchosArm64()
 	watchosArm32()
-	watchosX64()
 	watchosDeviceArm64()
 	watchosSimulatorArm64()
 
@@ -71,7 +67,7 @@ kotlin {
 
 	// noinspection GradleDynamicVersion
 	sourceSets.commonMain.dependencies {
-		implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:+")
+		implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.+")
 	}
 }
 
@@ -86,7 +82,7 @@ afterEvaluate {
 				pom {
 					name = "FVV"
 					description = "FVV Language for Kotlin"
-					url = "https://github.com/FVV-Lang/FVV.kt"
+					url = "https://fvvlang.sbs/"
 
 					licenses {
 						license {
@@ -122,9 +118,7 @@ afterEvaluate {
 					else             -> listOf(
 						"${name}RuntimeClasspath", "${name}CompileKlibraries"
 					).firstOrNull { project.configurations.findByName(it) != null }
-				}?.let {
-					versionMapping { allVariants { fromResolutionOf(it) } }
-				}
+				}?.let { versionMapping { allVariants { fromResolutionOf(it) } } }
 			}
 		}
 		repositories { mavenLocal() }
