@@ -86,7 +86,7 @@ afterEvaluate {
 
 					licenses {
 						license {
-							name = "F2DLPRL"
+							name = "File-to-Downloader"
 							url = "https://license.fileto.download/LICENSE.txt"
 							distribution = "repo"
 						}
